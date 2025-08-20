@@ -5,28 +5,54 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Three.js Curved Carousel — Local Media</title>
   <style>
-    html,body{height:100%; width:100%; margin:0}
+    html,body{height:100%; width:100%; margin:0; overscroll-behavior: none;}
     body{background:#2F2E33;font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-    #main{height: 100hv;}
+    #main{height: 100vh;}
     #stage{display:flex;position:absolute;inset:0;}
     #stage,
     #stage canvas {
     background: transparent !important;
+    touch-action: none;
     }
     #sometext{
         display: block;
-        width: 500px;
+        width: 18%;
         padding-top: 0px;
-        margin: 100px 0 0 100px;
+        margin: 5% 0 0 0;
     }
     #sometext h1{color: #3A5199;font-size: 46px;}
     #sometext p{color: #7f7b90;font-size: 18px;}
-    #somesvg{width: 1000px; zoom: .75;}
-    #bakcontent{display: flex;}
+    #somesvg{width: 80%; zoom: .75;}
+    #bakcontent{display: flex; align-content: flex-start; flex-wrap: wrap; overflow: hidden; }
     .ui{position:fixed;left:0;right:0;bottom:20px;display:flex;gap:12px;justify-content:center;pointer-events:none}
     .btn{pointer-events:auto;border:0;padding:.6rem 1rem;border-radius:999px;background:#1119;color:#fff;backdrop-filter:blur(6px);box-shadow:0 10px 25px rgba(0,0,0,.15);cursor:pointer}
     .btn:hover{background:#111c}
-    .hint{position:fixed;left:20px;top:20px;background:#0007;color:#fff;padding:.5rem .75rem;border-radius:8px;font-size:12px}
+    .hint{position:fixed;left:20px;top:20px;
+      background:#0007;color:#fff;
+      padding:.5rem .75rem;border-radius:8px;
+      font-size:12px;
+      pointer-events: none;}
+    /* ==== Responsive tweaks ==== */
+    @media (max-width: 1400px){
+      #sometext{ width:min(520px,46vw); margin:8vh 6vw 0; }
+      #sometext h1{ font-size:40px; }
+      #somesvg{ width:56vw; zoom:1; }  /* не держим жёсткие 1000px */
+    }
+    @media (max-width: 1024px){
+      #bakcontent{ flex-direction:row; }
+      #sometext{ width:min(40vw); margin:14vh 0 0 1%; padding:0 16px; }
+      #somesvg{ width:min(50vw,900px); opacity:.18; zoom: .5; } /* уводим фон, чтобы текст читался */
+      .ui{ bottom:12px; }
+      .hint{ left:12px; right:12px; top:12px; font-size:11px; }
+    }
+    @media (min-width: 2500px){
+      #sometext{ width:min(700px,36vw); margin:10vh 8vw 0; }
+      #sometext h1{ font-size:56px; letter-spacing:.2px; }
+      #somesvg{ width:52vw; zoom:1.15; margin-top: 10vh; }
+      .ui{ bottom:32px; gap:16px; }
+      .btn{ padding:.7rem 1.2rem; font-size:1rem; }
+      .hint{ top:24px; left:24px; font-size:13px; }
+      }
   </style>
 </head>
 <body>
@@ -198,6 +224,11 @@
     const HEIGHT = 20.0;                            // высота панели
     const ARC    = THREE.MathUtils.degToRad(65);   // дуга одного сегмента
     const STEP   = (Math.PI * 2) / PANELS;         // угол между панелями
+
+    // геометрия и масштаб под размер окна
+    const SEGMENTS = (Math.min(window.innerWidth, window.innerHeight) < 700) ? 32 : 64;
+    let SCALE = 1;
+    let rotation = 0, target = 0, velocity = 0;  // рад
    
   
     // фон полей при режиме "contain" (как у постера)
@@ -213,6 +244,7 @@
     renderer.setClearColor(0x000000, 0); // <— альфа = 0, канвас прозрачный
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
+    renderer.domElement.style.touchAction = 'none';
     stage.appendChild(renderer.domElement);
 
     // на всякий случай, если где-то переопределится CSS:
@@ -236,12 +268,27 @@
     ground.position.y = -HEIGHT*0.52;
     ground.receiveShadow = true;
     scene.add(ground);
+
+    // === масштаб сцены под окно и пересчёт камеры ===
+    function onResize(){
+      const w = stage.clientWidth, h = stage.clientHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w/h; camera.updateProjectionMatrix();
+
+      // базовый макет ~1280×800 → под это нормируем
+      const byW = w/1280, byH = h/800;
+      SCALE = THREE.MathUtils.clamp(Math.min(byW, byH)*1.05, 0.45, 1.25);
+
+      carousel.scale.setScalar(SCALE);
+      ground.scale.setScalar(SCALE);
+      render();
+    }
+    new ResizeObserver(onResize).observe(stage);
+    onResize();
   
     // Сегмент цилиндра — слегка изогнутая «карточка»
     function createPanel(tex){
-      const geo = new THREE.CylinderGeometry(
-        RADIUS, RADIUS, HEIGHT, 32, 1, true, -ARC/2, ARC
-      );
+      const geo = new THREE.CylinderGeometry(RADIUS, RADIUS, HEIGHT, SEGMENTS, 1, true, -ARC/2, ARC);
       const mat = new THREE.MeshStandardMaterial({
         map: tex, side: THREE.BackSide, roughness: 0.8, metalness: 0.0,
         transparent: true, alphaTest: 0.02 // чтобы контуры были чистыми
@@ -302,7 +349,7 @@
     });
   
     // ===== Взаимодействие (инерция + снап) =====
-    let rotation = 0, target = 0, velocity = 0;  // рад
+    
     const snap = (a)=> Math.round(a / STEP) * STEP;
     function go(steps){ target = snap(rotation) + steps * STEP; animate(); }
   
@@ -366,14 +413,24 @@
     }, { passive:false });
   
     let dragging=false, lastX=0;
-    stage.addEventListener('pointerdown', (e)=>{ dragging=true; lastX=e.clientX; stage.setPointerCapture(e.pointerId); });
+    stage.addEventListener('pointerdown', (e)=>{ 
+      e.preventDefault();
+      dragging=true; 
+      lastX=e.clientX; 
+      stage.setPointerCapture(e.pointerId);
+     });
     stage.addEventListener('pointermove', (e)=>{
       if(!dragging) return;
+      e.preventDefault();
       const dx=e.clientX-lastX; lastX=e.clientX;
-      const sens=0.0032; rotation -= dx*sens; velocity = -dx*sens*0.25; render();
+     
+        const baseSens = 0.0032;
+        const sens = baseSens / Math.max(0.5, SCALE);
+        rotation -= dx*sens; velocity = -dx*sens*0.25; render();
     });
     stage.addEventListener('pointerup',   (e)=>{ if(dragging){ dragging=false; stage.releasePointerCapture(e.pointerId); target = snap(rotation); animate(); }});
     stage.addEventListener('pointerleave',()=>{ if(dragging){ dragging=false; target = snap(rotation); animate(); }});
+    stage.addEventListener('pointercancel',()=>{ if(dragging){ dragging=false; target = snap(rotation); animate(); }});
   
     let raf=null;
     function animate(){ if(raf) return; raf = requestAnimationFrame(tick); }
@@ -389,16 +446,16 @@
     }
   
     function render(){ carousel.rotation.y = rotation; renderer.render(scene, camera); }
-  
+
     // Resize
-    function onResize(){
-      const w=stage.clientWidth, h=stage.clientHeight;
-      renderer.setSize(w,h,false);
-      camera.aspect=w/h; camera.updateProjectionMatrix();
-      render();
-    }
-    new ResizeObserver(onResize).observe(stage);
-    onResize();
+    //function onResize(){
+    //  const w=stage.clientWidth, h=stage.clientHeight;
+    //  renderer.setSize(w,h,false);
+    //  camera.aspect=w/h; camera.updateProjectionMatrix();
+    //  render();
+    //}
+    //new ResizeObserver(onResize).observe(stage);
+    //onResize();
   
     // Клик по сцене — лёгкий pop у центральной панели
     stage.addEventListener('click', ()=>{
