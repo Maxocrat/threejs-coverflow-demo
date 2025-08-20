@@ -11,8 +11,26 @@ Interactive 3D coverflow carousel built with **Three.js**. Curved panels (cylind
 - Image “contain” handling for any aspect ratio (NPOT-friendly, anisotropy)
 - Optional full-page recording (WebM) via `getDisplayMedia`
 
-## Quick start
-Download or clone and open `index.html` in a modern browser (no build tools required).
+
+## Quick start (local)
+
+No build tools needed, but open the page via a local HTTP server (browsers block
+WebGL textures when opening files from `file://`).
+
+Option A — VS Code:
+1) Install the “Live Server” extension.
+2) Right-click `index.html` → “Open with Live Server”.
+3) The app will open at something like http://127.0.0.1:5500/
+
+Option B — Python (preinstalled on most systems):
+Windows:  py -m http.server 8000
+macOS/Linux:  python3 -m http.server 8000
+Open http://localhost:8000/
+
+Option C — Node:
+npx http-server@14 . -p 5173
+Open http://localhost:5173/
+
 
 ```text
 threejs-coverflow-demo/
